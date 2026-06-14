@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Job Application Tracker
 
-## Getting Started
+Job Application Tracker is a web app built with Next.js, TypeScript, and Tailwind CSS.
 
-First, run the development server:
+The app helps users track job applications, including company name, job title, application status, date, job link, and notes.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Live Demo
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+[View Live Project](https://job-application-tracker-rouge-nu.vercel.app)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## GitHub Repository
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+[View Source Code](https://github.com/fasihbabar123/job-application-tracker)
 
-## Learn More
+## About This Project
 
-To learn more about Next.js, take a look at the following resources:
+This project is part of my full-stack development learning path. I built it to practice form handling, React state management, filtering, deleting items, and dashboard-style UI design.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The current version stores job applications in React state. A future version will connect to a database so applications stay saved after refreshing the page.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Features
 
-## Deploy on Vercel
+- Add job applications
+- Track company name and job title
+- Select application status
+- Add application date
+- Add job link
+- Add notes
+- View application cards
+- Filter applications by status
+- Delete applications
+- Dashboard statistics
+- Required field validation
+- Responsive layout
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Application Statuses
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Applied
+- Interview
+- Offer
+- Rejected
+
+## Tech Stack
+
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+- Git
+- GitHub
+- Vercel
+
+## What I Learned
+
+While building this project, I practiced:
+
+- Creating a Next.js app
+- Building forms with React
+- Managing form input state
+- Using TypeScript types
+- Rendering dynamic lists
+- Filtering data
+- Deleting items from state
+- Creating dashboard statistics
+- Styling status badges with Tailwind CSS
+- Deploying a project to Vercel
+
+## Current Status
+
+Completed:
+
+- Job application form
+- Applications list
+- Status badges
+- Application stats
+- Status filter
+- Delete button
+- Vercel deployment
+
+Planned improvements:
+
+- Add database storage
+- Add authentication
+- Add edit application feature
+- Add search feature
+- Add priority field
+- Add company contact details
+- Add application deadline reminders
+
+## Contact
+
+Email: fasihbabar901@gmail.com  
+GitHub: [fasihbabar123](https://github.com/fasihbabar123)
