@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type JobStatus = "Applied" | "Interview" | "Offer" | "Rejected";
 type JobPriority = "Low" | "Medium" | "High";
@@ -29,19 +29,21 @@ const priorityStyles: Record<JobPriority, string> = {
   High: "border-purple-400/40 bg-purple-400/10 text-purple-300",
 };
 
+const starterJobs: JobApplication[] = [
+  {
+    id: 1,
+    company: "Example Tech",
+    title: "Frontend Developer",
+    status: "Applied",
+    priority: "Medium",
+    date: "2026-06-13",
+    link: "https://example.com",
+    notes: "Applied through company website.",
+  },
+];
+
 export default function Home() {
-  const [jobs, setJobs] = useState<JobApplication[]>([
-    {
-      id: 1,
-      company: "Example Tech",
-      title: "Frontend Developer",
-      status: "Applied",
-      priority: "Medium",
-      date: "2026-06-13",
-      link: "https://example.com",
-      notes: "Applied through company website.",
-    },
-  ]);
+  const [jobs, setJobs] = useState<JobApplication[]>(starterJobs);
 
   const [company, setCompany] = useState("");
   const [title, setTitle] = useState("");
@@ -55,6 +57,23 @@ export default function Home() {
   const [filter, setFilter] = useState<JobStatus | "All">("All");
   const [search, setSearch] = useState("");
   const [editingJobId, setEditingJobId] = useState<number | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
+
+  useEffect(() => {
+    const savedJobs = localStorage.getItem("job-applications");
+
+    if (savedJobs) {
+      setJobs(JSON.parse(savedJobs));
+    }
+
+    setHasLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (hasLoaded) {
+      localStorage.setItem("job-applications", JSON.stringify(jobs));
+    }
+  }, [jobs, hasLoaded]);
 
   const appliedCount = jobs.filter((job) => job.status === "Applied").length;
   const interviewCount = jobs.filter((job) => job.status === "Interview").length;
@@ -156,6 +175,22 @@ export default function Home() {
     setMessage("Job application deleted.");
   }
 
+  function handleClearAllJobs() {
+    setJobs([]);
+    resetForm();
+    setSearch("");
+    setFilter("All");
+    setMessage("All job applications cleared.");
+  }
+
+  function handleLoadStarterJob() {
+    setJobs(starterJobs);
+    resetForm();
+    setSearch("");
+    setFilter("All");
+    setMessage("Starter job loaded.");
+  }
+
   return (
     <main className="min-h-screen bg-slate-950 text-white">
       <section className="mx-auto max-w-6xl px-6 py-12">
@@ -172,6 +207,10 @@ export default function Home() {
             <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-300">
               Track job applications, statuses, priorities, dates, links, and
               notes in one simple dashboard.
+            </p>
+
+            <p className="mt-3 text-sm text-slate-500">
+              Your applications are saved in this browser using localStorage.
             </p>
           </div>
 
@@ -366,6 +405,26 @@ export default function Home() {
               className="mt-5 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400"
             />
 
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                onClick={handleClearAllJobs}
+                type="button"
+                className="rounded-full border border-red-400/40 px-4 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-400/10"
+              >
+                Clear All Jobs
+              </button>
+
+              {jobs.length === 0 && (
+                <button
+                  onClick={handleLoadStarterJob}
+                  type="button"
+                  className="rounded-full border border-cyan-400/40 px-4 py-2 text-xs font-semibold text-cyan-300 transition hover:bg-cyan-400/10"
+                >
+                  Load Starter Job
+                </button>
+              )}
+            </div>
+
             <div className="mt-6 space-y-4">
               {filteredJobs.map((job) => (
                 <div
@@ -442,9 +501,16 @@ export default function Home() {
                 </div>
               ))}
 
-              {filteredJobs.length === 0 && (
+              {filteredJobs.length === 0 && jobs.length > 0 && (
                 <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5 text-sm text-slate-300">
-                  No applications found.
+                  No applications match your search or selected filter.
+                </div>
+              )}
+
+              {jobs.length === 0 && (
+                <div className="rounded-2xl border border-slate-800 bg-slate-950 p-6 text-sm leading-7 text-slate-300">
+                  No job applications yet. Add your first job using the form, or
+                  load the starter job.
                 </div>
               )}
 
