@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 type JobStatus = "Applied" | "Interview" | "Offer" | "Rejected";
 type JobPriority = "Low" | "Medium" | "High";
@@ -14,6 +15,7 @@ type JobApplication = {
   date: string;
   link: string;
   notes: string;
+  created_at?: string;
 };
 
 const statusStyles: Record<JobStatus, string> = {
@@ -29,21 +31,8 @@ const priorityStyles: Record<JobPriority, string> = {
   High: "border-purple-400/40 bg-purple-400/10 text-purple-300",
 };
 
-const starterJobs: JobApplication[] = [
-  {
-    id: 1,
-    company: "Example Tech",
-    title: "Frontend Developer",
-    status: "Applied",
-    priority: "Medium",
-    date: "2026-06-13",
-    link: "https://example.com",
-    notes: "Applied through company website.",
-  },
-];
-
 export default function Home() {
-  const [jobs, setJobs] = useState<JobApplication[]>(starterJobs);
+  const [jobs, setJobs] = useState<JobApplication[]>([]);
 
   const [company, setCompany] = useState("");
   const [title, setTitle] = useState("");
@@ -57,23 +46,30 @@ export default function Home() {
   const [filter, setFilter] = useState<JobStatus | "All">("All");
   const [search, setSearch] = useState("");
   const [editingJobId, setEditingJobId] = useState<number | null>(null);
-  const [hasLoaded, setHasLoaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const savedJobs = localStorage.getItem("job-applications");
-
-    if (savedJobs) {
-      setJobs(JSON.parse(savedJobs));
-    }
-
-    setHasLoaded(true);
+    loadJobs();
   }, []);
 
-  useEffect(() => {
-    if (hasLoaded) {
-      localStorage.setItem("job-applications", JSON.stringify(jobs));
+  async function loadJobs() {
+    setIsLoading(true);
+
+    const { data, error } = await supabase
+      .from("jobs")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      setMessage("Could not load jobs from Supabase.");
+      setIsLoading(false);
+      return;
     }
-  }, [jobs, hasLoaded]);
+
+    setJobs((data || []) as JobApplication[]);
+    setIsLoading(false);
+  }
 
   const appliedCount = jobs.filter((job) => job.status === "Applied").length;
   const interviewCount = jobs.filter((job) => job.status === "Interview").length;
@@ -102,7 +98,9 @@ export default function Home() {
     setEditingJobId(null);
   }
 
-  function handleAddOrUpdateJob(event: React.FormEvent<HTMLFormElement>) {
+  async function handleAddOrUpdateJob(
+    event: React.FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
 
     if (!company.trim() || !title.trim()) {
@@ -110,30 +108,37 @@ export default function Home() {
       return;
     }
 
-    if (editingJobId) {
-      const updatedJobs = jobs.map((job) =>
-        job.id === editingJobId
-          ? {
-              ...job,
-              company,
-              title,
-              status,
-              priority,
-              date,
-              link,
-              notes,
-            }
-          : job
-      );
+    setIsSaving(true);
+    setMessage("");
 
-      setJobs(updatedJobs);
+    if (editingJobId) {
+      const { error } = await supabase
+        .from("jobs")
+        .update({
+          company,
+          title,
+          status,
+          priority,
+          date,
+          link,
+          notes,
+        })
+        .eq("id", editingJobId);
+
+      if (error) {
+        setMessage("Could not update job application.");
+        setIsSaving(false);
+        return;
+      }
+
       setMessage("Job application updated successfully.");
       resetForm();
+      await loadJobs();
+      setIsSaving(false);
       return;
     }
 
-    const newJob: JobApplication = {
-      id: Date.now(),
+    const { error } = await supabase.from("jobs").insert({
       company,
       title,
       status,
@@ -141,11 +146,18 @@ export default function Home() {
       date,
       link,
       notes,
-    };
+    });
 
-    setJobs([newJob, ...jobs]);
+    if (error) {
+      setMessage("Could not add job application.");
+      setIsSaving(false);
+      return;
+    }
+
     setMessage("Job application added successfully.");
     resetForm();
+    await loadJobs();
+    setIsSaving(false);
   }
 
   function handleEditJob(job: JobApplication) {
@@ -165,30 +177,45 @@ export default function Home() {
     setMessage("Edit cancelled.");
   }
 
-  function handleDeleteJob(id: number) {
-    setJobs(jobs.filter((job) => job.id !== id));
+  async function handleDeleteJob(id: number) {
+    const { error } = await supabase.from("jobs").delete().eq("id", id);
+
+    if (error) {
+      setMessage("Could not delete job application.");
+      return;
+    }
 
     if (editingJobId === id) {
       resetForm();
     }
 
     setMessage("Job application deleted.");
+    await loadJobs();
   }
 
-  function handleClearAllJobs() {
-    setJobs([]);
-    resetForm();
-    setSearch("");
-    setFilter("All");
-    setMessage("All job applications cleared.");
-  }
+  async function handleLoadStarterJob() {
+    setIsSaving(true);
 
-  function handleLoadStarterJob() {
-    setJobs(starterJobs);
-    resetForm();
-    setSearch("");
-    setFilter("All");
+    const { error } = await supabase.from("jobs").insert({
+      company: "Example Tech",
+      title: "Frontend Developer",
+      status: "Applied",
+      priority: "Medium",
+      date: "2026-06-13",
+      link: "https://example.com",
+      notes: "Applied through company website.",
+    });
+
+    if (error) {
+      setMessage("Could not load starter job.");
+      setIsSaving(false);
+      return;
+    }
+
     setMessage("Starter job loaded.");
+    resetForm();
+    await loadJobs();
+    setIsSaving(false);
   }
 
   return (
@@ -210,7 +237,7 @@ export default function Home() {
             </p>
 
             <p className="mt-3 text-sm text-slate-500">
-              Your applications are saved in this browser using localStorage.
+              Your applications are now saved in a Supabase database.
             </p>
           </div>
 
@@ -354,10 +381,15 @@ export default function Home() {
               </div>
 
               <button
+                disabled={isSaving}
                 type="submit"
-                className="w-full rounded-xl bg-cyan-400 px-5 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300"
+                className="w-full rounded-xl bg-cyan-400 px-5 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {editingJobId ? "Update Job Application" : "Add Job Application"}
+                {isSaving
+                  ? "Saving..."
+                  : editingJobId
+                    ? "Update Job Application"
+                    : "Add Job Application"}
               </button>
 
               {editingJobId && (
@@ -405,109 +437,106 @@ export default function Home() {
               className="mt-5 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400"
             />
 
-            <div className="mt-4 flex flex-wrap gap-3">
+            {jobs.length === 0 && !isLoading && (
               <button
-                onClick={handleClearAllJobs}
+                onClick={handleLoadStarterJob}
                 type="button"
-                className="rounded-full border border-red-400/40 px-4 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-400/10"
+                className="mt-4 rounded-full border border-cyan-400/40 px-4 py-2 text-xs font-semibold text-cyan-300 transition hover:bg-cyan-400/10"
               >
-                Clear All Jobs
+                Load Starter Job
               </button>
-
-              {jobs.length === 0 && (
-                <button
-                  onClick={handleLoadStarterJob}
-                  type="button"
-                  className="rounded-full border border-cyan-400/40 px-4 py-2 text-xs font-semibold text-cyan-300 transition hover:bg-cyan-400/10"
-                >
-                  Load Starter Job
-                </button>
-              )}
-            </div>
+            )}
 
             <div className="mt-6 space-y-4">
-              {filteredJobs.map((job) => (
-                <div
-                  key={job.id}
-                  className="rounded-2xl border border-slate-800 bg-slate-950 p-5"
-                >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <h3 className="text-xl font-bold">{job.title}</h3>
-                      <p className="mt-1 text-slate-300">{job.company}</p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={`w-fit rounded-full border px-3 py-1 text-xs font-semibold ${statusStyles[job.status]}`}
-                      >
-                        {job.status}
-                      </span>
-
-                      <span
-                        className={`w-fit rounded-full border px-3 py-1 text-xs font-semibold ${priorityStyles[job.priority]}`}
-                      >
-                        {job.priority}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid gap-3 text-sm text-slate-300 sm:grid-cols-2">
-                    <p>
-                      <span className="text-slate-500">Date:</span>{" "}
-                      {job.date || "Not added"}
-                    </p>
-
-                    <p>
-                      <span className="text-slate-500">Link:</span>{" "}
-                      {job.link ? (
-                        <a
-                          href={job.link}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-cyan-300 hover:underline"
-                        >
-                          View Job
-                        </a>
-                      ) : (
-                        "Not added"
-                      )}
-                    </p>
-                  </div>
-
-                  {job.notes && (
-                    <p className="mt-4 rounded-xl bg-slate-900 p-4 text-sm leading-6 text-slate-300">
-                      {job.notes}
-                    </p>
-                  )}
-
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <button
-                      onClick={() => handleEditJob(job)}
-                      type="button"
-                      className="rounded-full border border-cyan-400/40 px-4 py-2 text-xs font-semibold text-cyan-300 transition hover:bg-cyan-400/10"
-                    >
-                      Edit
-                    </button>
-
-                    <button
-                      onClick={() => handleDeleteJob(job.id)}
-                      type="button"
-                      className="rounded-full border border-red-400/40 px-4 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-400/10"
-                    >
-                      Delete
-                    </button>
-                  </div>
+              {isLoading && (
+                <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5 text-sm text-slate-300">
+                  Loading jobs from Supabase...
                 </div>
-              ))}
+              )}
 
-              {filteredJobs.length === 0 && jobs.length > 0 && (
+              {!isLoading &&
+                filteredJobs.map((job) => (
+                  <div
+                    key={job.id}
+                    className="rounded-2xl border border-slate-800 bg-slate-950 p-5"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <h3 className="text-xl font-bold">{job.title}</h3>
+                        <p className="mt-1 text-slate-300">{job.company}</p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`w-fit rounded-full border px-3 py-1 text-xs font-semibold ${statusStyles[job.status]}`}
+                        >
+                          {job.status}
+                        </span>
+
+                        <span
+                          className={`w-fit rounded-full border px-3 py-1 text-xs font-semibold ${priorityStyles[job.priority]}`}
+                        >
+                          {job.priority}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 text-sm text-slate-300 sm:grid-cols-2">
+                      <p>
+                        <span className="text-slate-500">Date:</span>{" "}
+                        {job.date || "Not added"}
+                      </p>
+
+                      <p>
+                        <span className="text-slate-500">Link:</span>{" "}
+                        {job.link ? (
+                          <a
+                            href={job.link}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-cyan-300 hover:underline"
+                          >
+                            View Job
+                          </a>
+                        ) : (
+                          "Not added"
+                        )}
+                      </p>
+                    </div>
+
+                    {job.notes && (
+                      <p className="mt-4 rounded-xl bg-slate-900 p-4 text-sm leading-6 text-slate-300">
+                        {job.notes}
+                      </p>
+                    )}
+
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <button
+                        onClick={() => handleEditJob(job)}
+                        type="button"
+                        className="rounded-full border border-cyan-400/40 px-4 py-2 text-xs font-semibold text-cyan-300 transition hover:bg-cyan-400/10"
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteJob(job.id)}
+                        type="button"
+                        className="rounded-full border border-red-400/40 px-4 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-400/10"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+              {!isLoading && filteredJobs.length === 0 && jobs.length > 0 && (
                 <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5 text-sm text-slate-300">
                   No applications match your search or selected filter.
                 </div>
               )}
 
-              {jobs.length === 0 && (
+              {!isLoading && jobs.length === 0 && (
                 <div className="rounded-2xl border border-slate-800 bg-slate-950 p-6 text-sm leading-7 text-slate-300">
                   No job applications yet. Add your first job using the form, or
                   load the starter job.
