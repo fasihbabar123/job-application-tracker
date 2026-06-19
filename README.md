@@ -6,8 +6,7 @@ The app helps users track job applications, including company name, job title, a
 
 ## Live Demo
 
-[View Live Project](https://vercel.com/fasih-babar-s-projects/job-application-tracker/83LLKMvgmJNBTiQWoBQAEZxDmvAr)
-
+[View Live Project](https://job-application-tracker-rouge-nu.vercel.app)
 ## GitHub Repository
 
 [View Source Code](https://github.com/fasihbabar123/job-application-tracker)

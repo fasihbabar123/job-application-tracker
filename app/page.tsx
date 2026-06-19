@@ -195,7 +195,8 @@ export default function Home() {
 
   async function handleLoadStarterJob() {
     setIsSaving(true);
-
+    setMessage("");
+  
     const { error } = await supabase.from("jobs").insert({
       company: "Example Tech",
       title: "Frontend Developer",
@@ -205,13 +206,14 @@ export default function Home() {
       link: "https://example.com",
       notes: "Applied through company website.",
     });
-
+  
     if (error) {
-      setMessage("Could not load starter job.");
+      console.error(error);
+      setMessage(`Could not load starter job: ${error.message}`);
       setIsSaving(false);
       return;
     }
-
+  
     setMessage("Starter job loaded.");
     resetForm();
     await loadJobs();
