@@ -7,13 +7,14 @@ The app helps users track job applications, including company name, job title, a
 ## Live Demo
 
 [View Live Project](https://job-application-tracker-rouge-nu.vercel.app)
+
 ## GitHub Repository
 
 [View Source Code](https://github.com/fasihbabar123/job-application-tracker)
 
 ## About This Project
 
-This project is part of my full-stack development learning path. I built it to practice working with forms, React state, filtering, editing, deleting, and saving application data in a real Supabase database.
+This project is part of my full-stack development learning path. I built it to practice working with forms, React state, filtering, searching, editing, deleting, and saving application data in a real Supabase database.
 
 The project started as a local React state app, then was upgraded to use localStorage, and finally connected to Supabase for persistent database storage.
 
