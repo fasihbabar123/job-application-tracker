@@ -1,12 +1,12 @@
 # Job Application Tracker
 
-Job Application Tracker is a web app built with Next.js, TypeScript, and Tailwind CSS.
+Job Application Tracker is a full-stack job tracking dashboard built with Next.js, TypeScript, Tailwind CSS, and Supabase.
 
-The app helps users track job applications, including company name, job title, application status, date, job link, and notes.
+The app helps users track job applications, including company name, job title, application status, priority, application date, job link, and notes.
 
 ## Live Demo
 
-[View Live Project](https://job-application-tracker-rouge-nu.vercel.app)
+[View Live Project](https://vercel.com/fasih-babar-s-projects/job-application-tracker/83LLKMvgmJNBTiQWoBQAEZxDmvAr)
 
 ## GitHub Repository
 
@@ -14,23 +14,27 @@ The app helps users track job applications, including company name, job title, a
 
 ## About This Project
 
-This project is part of my full-stack development learning path. I built it to practice form handling, React state management, filtering, deleting items, and dashboard-style UI design.
+This project is part of my full-stack development learning path. I built it to practice working with forms, React state, filtering, editing, deleting, and saving application data in a real Supabase database.
 
-The current version stores job applications in React state. A future version will connect to a database so applications stay saved after refreshing the page.
+The project started as a local React state app, then was upgraded to use localStorage, and finally connected to Supabase for persistent database storage.
 
 ## Features
 
 - Add job applications
+- Edit job applications
+- Delete job applications
 - Track company name and job title
 - Select application status
+- Select priority level
 - Add application date
 - Add job link
 - Add notes
 - View application cards
 - Filter applications by status
-- Delete applications
+- Search applications by company or job title
 - Dashboard statistics
 - Required field validation
+- Supabase database storage
 - Responsive layout
 
 ## Application Statuses
@@ -40,54 +44,35 @@ The current version stores job applications in React state. A future version wil
 - Offer
 - Rejected
 
+## Priority Levels
+
+- Low
+- Medium
+- High
+
 ## Tech Stack
 
 - Next.js
 - React
 - TypeScript
 - Tailwind CSS
+- Supabase
+- PostgreSQL
 - Git
 - GitHub
 - Vercel
 
-## What I Learned
+## How It Works
 
-While building this project, I practiced:
+The app uses a Supabase `jobs` table to store job applications.
 
-- Creating a Next.js app
-- Building forms with React
-- Managing form input state
-- Using TypeScript types
-- Rendering dynamic lists
-- Filtering data
-- Deleting items from state
-- Creating dashboard statistics
-- Styling status badges with Tailwind CSS
-- Deploying a project to Vercel
+When the page loads, the app fetches saved jobs from Supabase.
 
-## Current Status
+When a user adds, edits, or deletes a job, the app sends the change to Supabase and reloads the updated job list.
 
-Completed:
+## Database Table
 
-- Job application form
-- Applications list
-- Status badges
-- Application stats
-- Status filter
-- Delete button
-- Vercel deployment
+Table name:
 
-Planned improvements:
-
-- Add database storage
-- Add authentication
-- Add edit application feature
-- Add search feature
-- Add priority field
-- Add company contact details
-- Add application deadline reminders
-
-## Contact
-
-Email: fasihbabar901@gmail.com  
-GitHub: [fasihbabar123](https://github.com/fasihbabar123)
+```txt
+jobs
