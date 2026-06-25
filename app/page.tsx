@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
 type JobStatus = "Applied" | "Interview" | "Offer" | "Rejected";
@@ -15,6 +16,7 @@ type JobApplication = {
   date: string;
   link: string;
   notes: string;
+  user_id?: string;
   created_at?: string;
 };
 
@@ -31,14 +33,26 @@ const priorityStyles: Record<JobPriority, string> = {
   High: "border-purple-400/40 bg-purple-400/10 text-purple-300",
 };
 
+function getTodayDate() {
+  return new Date().toISOString().split("T")[0];
+}
+
 export default function Home() {
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+
   const [jobs, setJobs] = useState<JobApplication[]>([]);
 
   const [company, setCompany] = useState("");
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<JobStatus>("Applied");
   const [priority, setPriority] = useState<JobPriority>("Medium");
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(getTodayDate());
   const [link, setLink] = useState("");
   const [notes, setNotes] = useState("");
   const [message, setMessage] = useState("");
@@ -46,19 +60,130 @@ export default function Home() {
   const [filter, setFilter] = useState<JobStatus | "All">("All");
   const [search, setSearch] = useState("");
   const [editingJobId, setEditingJobId] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    loadJobs();
+    async function checkUser() {
+      const { data } = await supabase.auth.getSession();
+
+      setUser(data.session?.user ?? null);
+      setIsAuthChecking(false);
+    }
+
+    checkUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  async function loadJobs() {
+  useEffect(() => {
+    if (isAuthChecking) return;
+
+    if (!user) {
+      setJobs([]);
+      setIsLoading(false);
+      return;
+    }
+
+    loadJobs(user.id);
+  }, [user, isAuthChecking]);
+
+  async function handleSignUp(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!authEmail.trim() || !authPassword.trim()) {
+      setAuthMessage("Email and password are required.");
+      return;
+    }
+
+    if (authPassword.length < 6) {
+      setAuthMessage("Password should be at least 6 characters.");
+      return;
+    }
+
+    setIsAuthLoading(true);
+    setAuthMessage("");
+
+    const { error } = await supabase.auth.signUp({
+      email: authEmail,
+      password: authPassword,
+    });
+
+    if (error) {
+      setAuthMessage(error.message);
+      setIsAuthLoading(false);
+      return;
+    }
+
+    setAuthMessage(
+      "Account created. If email confirmation is enabled, please check your email. Otherwise you can log in now."
+    );
+    setAuthMode("login");
+    setAuthPassword("");
+    setIsAuthLoading(false);
+  }
+
+  async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!authEmail.trim() || !authPassword.trim()) {
+      setAuthMessage("Email and password are required.");
+      return;
+    }
+
+    setIsAuthLoading(true);
+    setAuthMessage("");
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: authEmail,
+      password: authPassword,
+    });
+
+    if (error) {
+      setAuthMessage(error.message);
+      setIsAuthLoading(false);
+      return;
+    }
+
+    setAuthEmail("");
+    setAuthPassword("");
+    setAuthMessage("");
+    setIsAuthLoading(false);
+  }
+
+  async function handleLogout() {
+    setMessage("");
+    setAuthMessage("");
+    setAuthEmail("");
+    setAuthPassword("");
+    setAuthMode("login");
+
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    resetForm();
+    setJobs([]);
+  }
+
+  async function loadJobs(userId: string) {
     setIsLoading(true);
 
     const { data, error } = await supabase
       .from("jobs")
       .select("*")
+      .eq("user_id", userId)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -92,7 +217,7 @@ export default function Home() {
     setTitle("");
     setStatus("Applied");
     setPriority("Medium");
-    setDate("");
+    setDate(getTodayDate());
     setLink("");
     setNotes("");
     setEditingJobId(null);
@@ -102,6 +227,11 @@ export default function Home() {
     event: React.FormEvent<HTMLFormElement>
   ) {
     event.preventDefault();
+
+    if (!user) {
+      setMessage("Please log in before adding job applications.");
+      return;
+    }
 
     if (!company.trim() || !title.trim()) {
       setMessage("Company name and job title are required.");
@@ -123,7 +253,8 @@ export default function Home() {
           link,
           notes,
         })
-        .eq("id", editingJobId);
+        .eq("id", editingJobId)
+        .eq("user_id", user.id);
 
       if (error) {
         setMessage("Could not update job application.");
@@ -133,7 +264,7 @@ export default function Home() {
 
       setMessage("Job application updated successfully.");
       resetForm();
-      await loadJobs();
+      await loadJobs(user.id);
       setIsSaving(false);
       return;
     }
@@ -146,6 +277,7 @@ export default function Home() {
       date,
       link,
       notes,
+      user_id: user.id,
     });
 
     if (error) {
@@ -156,7 +288,7 @@ export default function Home() {
 
     setMessage("Job application added successfully.");
     resetForm();
-    await loadJobs();
+    await loadJobs(user.id);
     setIsSaving(false);
   }
 
@@ -166,7 +298,7 @@ export default function Home() {
     setTitle(job.title);
     setStatus(job.status);
     setPriority(job.priority);
-    setDate(job.date);
+    setDate(job.date || getTodayDate());
     setLink(job.link);
     setNotes(job.notes);
     setMessage("Editing selected job application.");
@@ -178,7 +310,16 @@ export default function Home() {
   }
 
   async function handleDeleteJob(id: number) {
-    const { error } = await supabase.from("jobs").delete().eq("id", id);
+    if (!user) {
+      setMessage("Please log in before deleting job applications.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("jobs")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id);
 
     if (error) {
       setMessage("Could not delete job application.");
@@ -190,34 +331,160 @@ export default function Home() {
     }
 
     setMessage("Job application deleted.");
-    await loadJobs();
+    await loadJobs(user.id);
   }
 
   async function handleLoadStarterJob() {
+    if (!user) {
+      setMessage("Please log in before loading starter job.");
+      return;
+    }
+
     setIsSaving(true);
     setMessage("");
-  
+
     const { error } = await supabase.from("jobs").insert({
       company: "Example Tech",
       title: "Frontend Developer",
       status: "Applied",
       priority: "Medium",
-      date: "2026-06-13",
+      date: getTodayDate(),
       link: "https://example.com",
       notes: "Applied through company website.",
+      user_id: user.id,
     });
-  
+
     if (error) {
       console.error(error);
       setMessage(`Could not load starter job: ${error.message}`);
       setIsSaving(false);
       return;
     }
-  
+
     setMessage("Starter job loaded.");
     resetForm();
-    await loadJobs();
+    await loadJobs(user.id);
     setIsSaving(false);
+  }
+
+  if (isAuthChecking) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-white">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-center">
+          <p className="text-lg font-semibold text-cyan-300">
+            Checking login status...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return (
+      <main className="min-h-screen bg-slate-950 px-6 py-12 text-white">
+        <section className="mx-auto max-w-md">
+          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-cyan-400">
+            Project 3
+          </p>
+
+          <h1 className="mt-4 text-4xl font-bold tracking-tight">
+            Job Application Tracker
+          </h1>
+
+          <p className="mt-4 leading-7 text-slate-300">
+            Sign up or log in to track your job applications, statuses,
+            priorities, dates, links, and notes.
+          </p>
+
+          <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => {
+                  setAuthMode("login");
+                  setAuthMessage("");
+                  setAuthPassword("");
+                }}
+                type="button"
+                className={`rounded-xl px-4 py-3 font-semibold transition ${
+                  authMode === "login"
+                    ? "bg-cyan-400 text-slate-950"
+                    : "border border-slate-700 text-slate-300 hover:border-cyan-400 hover:text-cyan-300"
+                }`}
+              >
+                Login
+              </button>
+
+              <button
+                onClick={() => {
+                  setAuthMode("signup");
+                  setAuthMessage("");
+                  setAuthPassword("");
+                }}
+                type="button"
+                className={`rounded-xl px-4 py-3 font-semibold transition ${
+                  authMode === "signup"
+                    ? "bg-cyan-400 text-slate-950"
+                    : "border border-slate-700 text-slate-300 hover:border-cyan-400 hover:text-cyan-300"
+                }`}
+              >
+                Sign Up
+              </button>
+            </div>
+
+            <form
+              onSubmit={authMode === "login" ? handleLogin : handleSignUp}
+              className="mt-6 space-y-4"
+            >
+              <div>
+                <label className="text-sm font-medium text-slate-200">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  autoComplete="off"
+                  value={authEmail}
+                  onChange={(event) => setAuthEmail(event.target.value)}
+                  placeholder="you@example.com"
+                  className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-200">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={authPassword}
+                  onChange={(event) => setAuthPassword(event.target.value)}
+                  placeholder="Minimum 6 characters"
+                  className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400"
+                />
+              </div>
+
+              <button
+                disabled={isAuthLoading}
+                type="submit"
+                className="w-full rounded-xl bg-cyan-400 px-5 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isAuthLoading
+                  ? "Please wait..."
+                  : authMode === "login"
+                    ? "Login"
+                    : "Create Account"}
+              </button>
+
+              {authMessage && (
+                <p className="text-sm leading-6 text-cyan-300">
+                  {authMessage}
+                </p>
+              )}
+            </form>
+          </div>
+        </section>
+      </main>
+    );
   }
 
   return (
@@ -239,37 +506,48 @@ export default function Home() {
             </p>
 
             <p className="mt-3 text-sm text-slate-500">
-              Your applications are now saved in a Supabase database.
+              Logged in as <span className="text-cyan-300">{user.email}</span>.
+              Your applications are saved in Supabase with your user account.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 px-5 py-4">
-              <p className="text-sm text-slate-400">Total</p>
-              <p className="mt-1 text-3xl font-bold text-cyan-400">
-                {jobs.length}
-              </p>
-            </div>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={handleLogout}
+              type="button"
+              className="rounded-xl border border-red-400/40 px-5 py-3 text-sm font-semibold text-red-300 transition hover:bg-red-400/10"
+            >
+              Logout
+            </button>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 px-5 py-4">
-              <p className="text-sm text-slate-400">Applied</p>
-              <p className="mt-1 text-3xl font-bold text-cyan-400">
-                {appliedCount}
-              </p>
-            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="rounded-2xl border border-slate-800 bg-slate-900 px-5 py-4">
+                <p className="text-sm text-slate-400">Total</p>
+                <p className="mt-1 text-3xl font-bold text-cyan-400">
+                  {jobs.length}
+                </p>
+              </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 px-5 py-4">
-              <p className="text-sm text-slate-400">Interview</p>
-              <p className="mt-1 text-3xl font-bold text-yellow-300">
-                {interviewCount}
-              </p>
-            </div>
+              <div className="rounded-2xl border border-slate-800 bg-slate-900 px-5 py-4">
+                <p className="text-sm text-slate-400">Applied</p>
+                <p className="mt-1 text-3xl font-bold text-cyan-400">
+                  {appliedCount}
+                </p>
+              </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 px-5 py-4">
-              <p className="text-sm text-slate-400">Offer</p>
-              <p className="mt-1 text-3xl font-bold text-emerald-300">
-                {offerCount}
-              </p>
+              <div className="rounded-2xl border border-slate-800 bg-slate-900 px-5 py-4">
+                <p className="text-sm text-slate-400">Interview</p>
+                <p className="mt-1 text-3xl font-bold text-yellow-300">
+                  {interviewCount}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-800 bg-slate-900 px-5 py-4">
+                <p className="text-sm text-slate-400">Offer</p>
+                <p className="mt-1 text-3xl font-bold text-emerald-300">
+                  {offerCount}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -452,7 +730,7 @@ export default function Home() {
             <div className="mt-6 space-y-4">
               {isLoading && (
                 <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5 text-sm text-slate-300">
-                  Loading jobs from Supabase...
+                  Loading your jobs from Supabase...
                 </div>
               )}
 
